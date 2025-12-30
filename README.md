@@ -1,4 +1,4 @@
-# API de Coupons
+# API de Cupons
 
 API de cupons de desconto desenvolvida como desafio técnico.
 
