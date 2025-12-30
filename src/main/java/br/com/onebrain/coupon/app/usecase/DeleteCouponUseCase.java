@@ -2,6 +2,8 @@ package br.com.onebrain.coupon.app.usecase;
 
 import br.com.onebrain.coupon.app.port.CouponRepositoryPort;
 import br.com.onebrain.coupon.domain.Coupon;
+import br.com.onebrain.coupon.domain.CouponMessages;
+import br.com.onebrain.coupon.domain.DomainException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -25,7 +27,7 @@ public class DeleteCouponUseCase
 
         Coupon coupon = repository
                 .findActiveById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Coupon not found or already deleted."));
+                .orElseThrow(() -> new DomainException(CouponMessages.NOT_FOUND_OR_DELETED));
 
         coupon.delete(Instant.now(clock));
         repository.save(coupon);

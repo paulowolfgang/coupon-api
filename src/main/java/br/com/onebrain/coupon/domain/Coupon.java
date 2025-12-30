@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Objects;
 import java.util.UUID;
 
 @Entity
@@ -18,11 +17,14 @@ import java.util.UUID;
 )
 public class Coupon
 {
+    public static final int MAXIMUM_CHARACTER_SIZE = 6;
+    public static final int MINIMUM_DISCOUNT_BALANCE = 0;
+
     @Id
     @GeneratedValue
     private UUID id;
 
-    @Column(name = "code", nullable = false, length = 6)
+    @Column(name = "code", nullable = false, length = MAXIMUM_CHARACTER_SIZE)
     private String code;
 
     @Column(name = "description", nullable = false, length = 255)
@@ -59,7 +61,7 @@ public class Coupon
                    Instant now)
     {
         this.code = normalizeAndValidateCode(code);
-        this.description = requireNonBlank(description, "description");
+        this.description = requireNonBlank(description, CouponMessages.DESCRIPTION_REQUIRED);
         this.discountValue = validateDiscount(discountValue);
         this.expirationDate = validateExpiration(expirationDate);
         this.published = published;
@@ -78,14 +80,14 @@ public class Coupon
                                 boolean published,
                                 Instant now)
     {
-        Objects.requireNonNull(now, "Now must not be null.");
+        requireNow(now);
         return new Coupon(code, description, discountValue, expirationDate, published, now);
     }
 
     public void publish(Instant now)
     {
         ensureNotDeleted();
-        Objects.requireNonNull(now, "Now must not be null.");
+        requireNow(now);
         this.published = true;
         touch(now);
     }
@@ -93,7 +95,7 @@ public class Coupon
     public void delete(Instant now)
     {
         ensureNotDeleted();
-        Objects.requireNonNull(now, "Now must not be null.");
+        requireNow(now);
         this.deleted = true;
         this.deletedAt = now;
         touch(now);
@@ -103,7 +105,7 @@ public class Coupon
     {
         if (this.deleted)
         {
-            throw new IllegalStateException("Coupon already deleted.");
+            throw new DomainException(CouponMessages.ALREADY_DELETED);
         }
     }
 
@@ -112,15 +114,23 @@ public class Coupon
         this.updatedAt = now;
     }
 
+    private static void requireNow(Instant now)
+    {
+        if (now == null)
+        {
+            throw new DomainException(CouponMessages.NOW_REQUIRED);
+        }
+    }
+
     private static String normalizeAndValidateCode(String raw)
     {
-        String validate = requireNonBlank(raw, "code");
+        String validate = requireNonBlank(raw, CouponMessages.CODE_REQUIRED);
 
         validate = validate.replaceAll("[^A-Za-z0-9]", "");
 
-        if (validate.length() != 6)
+        if (validate.length() != MAXIMUM_CHARACTER_SIZE)
         {
-            throw new IllegalArgumentException("Code must have exactly 6 alphanumeric characters after normalization.");
+            throw new DomainException(CouponMessages.CODE_INVALID_LENGTH, MAXIMUM_CHARACTER_SIZE);
         }
 
         return validate.toUpperCase();
@@ -128,11 +138,14 @@ public class Coupon
 
     private static BigDecimal validateDiscount(BigDecimal validate)
     {
-        Objects.requireNonNull(validate, "Discount value must not be null.");
-
-        if (validate.compareTo(new BigDecimal("0.50")) < 0)
+        if (validate == null)
         {
-            throw new IllegalArgumentException("Discount value must be >= 0.50");
+            throw new DomainException(CouponMessages.DISCOUNT_REQUIRED);
+        }
+
+        if (validate.compareTo(new BigDecimal("0.50")) < MINIMUM_DISCOUNT_BALANCE)
+        {
+            throw new DomainException(CouponMessages.DISCOUNT_MIN, "0.50");
         }
 
         return validate;
@@ -140,21 +153,24 @@ public class Coupon
 
     private static LocalDate validateExpiration(LocalDate date)
     {
-        Objects.requireNonNull(date, "Expiration date must not be null.");
+        if (date == null)
+        {
+            throw new DomainException(CouponMessages.EXPIRATION_REQUIRED);
+        }
 
         if (date.isBefore(LocalDate.now()))
         {
-            throw new IllegalArgumentException("Expiration date must not be in the past.");
+            throw new DomainException(CouponMessages.EXPIRATION_PAST);
         }
 
         return date;
     }
 
-    private static String requireNonBlank(String value, String field)
+    private static String requireNonBlank(String value, String messageKey)
     {
         if (value == null || value.trim().isEmpty())
         {
-            throw new IllegalArgumentException(field + " must not be blank.");
+            throw new DomainException(messageKey);
         }
 
         return value.trim();

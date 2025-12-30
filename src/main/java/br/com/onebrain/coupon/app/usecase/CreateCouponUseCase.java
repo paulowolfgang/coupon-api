@@ -2,6 +2,8 @@ package br.com.onebrain.coupon.app.usecase;
 
 import br.com.onebrain.coupon.app.port.CouponRepositoryPort;
 import br.com.onebrain.coupon.domain.Coupon;
+import br.com.onebrain.coupon.domain.CouponMessages;
+import br.com.onebrain.coupon.domain.DomainException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -32,6 +34,11 @@ public class CreateCouponUseCase
                 cmd.published(),
                 now
         );
+
+        if (repository.existsActiveByCode(coupon.getCode()))
+        {
+            throw new DomainException(CouponMessages.CODE_ALREADY_EXISTS);
+        }
 
         return repository.save(coupon);
     }
